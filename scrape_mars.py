@@ -11,15 +11,14 @@ def scrape():
     browser = Browser('chrome', **executable_path, headless=True)
     
     
-    first_title, first_paragraph = mars_news(browser)
+    news_title, news_paragraph = mars_news(browser)
     
   
     results = {
-        "title": first_title,
-        "paragraph": first_paragraph,
+        "title": news_title,
+        "paragraph": news_paragraph,
         "image_URL": jpl_image(browser),
         "weather": mars_weather_tweet(browser),
-        "facts": mars_facts(),
         "hemispheres": mars_hemis(browser),
     }
 
@@ -31,12 +30,11 @@ def mars_news(browser):
     url = 'https://mars.nasa.gov/news/'
     browser.visit(url)
     html = browser.html
-    mars_news_soup = BeautifulSoup(html, 'html.parser')
-
-    
-    first_title = mars_news_soup.find('div', class_='content_title').text
-    first_paragraph = mars_news_soup.find('div', class_='article_teaser_body').text
-    return first_title, first_paragraph
+    news_soup = BeautifulSoup(html, "html.parser")
+    slide_element = news_soup.select_one("ul.item_list li.slide")
+    news_title = slide_element.find("div", class_="content_title").get_text()
+    news_paragraph = slide_element.find("div", class_="article_teaser_body").get_text()
+    return news_title , news_paragraph
 
 def jpl_image(browser):
     url = 'https://www.jpl.nasa.gov/spaceimages/?search=&category=Mars'
@@ -62,55 +60,31 @@ def mars_weather_tweet(browser):
     tweet_soup = BeautifulSoup(html, 'html.parser')
     
  
-    first_tweet = tweet_soup.find('p', class_='TweetTextSize').text
-    return first_tweet
+    mars_weather  = tweet_soup.find('p', class_='TweetTextSize').text
+    return mars_weather 
     
-def mars_facts():
-    url = 'https://space-facts.com/mars/'
-    tables = pd.read_html(url)
-    df = tables[0]
-    df.columns = ['Property', 'Value']
-   
-    df.set_index('Property', inplace=True)
-    
- 
-    return df.to_html()
     
 def mars_hemis(browser):
-    url = 'https://astrogeology.usgs.gov/search/results?q=hemisphere+enhanced&k1=target&v1=Mars'
+    url = "https://astrogeology.usgs.gov/search/results?q=hemisphere+enhanced&k1=target&v1=Mars"
     browser.visit(url)
-    
-    html = browser.html
-    hemi_soup = BeautifulSoup(html, 'html.parser')
-
-    hemi_strings = []
-    links = hemi_soup.find_all('h3')
-    
-    for hemi in links:
-        hemi_strings.append(hemi.text)
-
-=
     hemisphere_image_urls = []
 
+# Get a List of All the Hemispheres
+    links = browser.find_by_css("a.product-item h3")
+    for item in range(len(links)):
+        hemisphere = {}
     
-    for hemi in hemi_strings:
-       
-        hemi_dict = {}
-        
-
-        browser.click_link_by_partial_text(hemi)
-        
-        hemi_dict["img_url"] = browser.find_by_text('Sample')['href']
-        
-        
-        hemi_dict["title"] = hemi
-        
- 
-        hemisphere_image_urls.append(hemi_dict)
+    # Find Element on Each Loop to Avoid a Stale Element Exception
+        browser.find_by_css("a.product-item h3")[item].click()
     
-        pprint(hemisphere_image_urls)
+    # Find Sample Image Anchor Tag & Extract <href>
+        sample_element = browser.find_link_by_text("Sample").first
+        hemisphere["img_url"] = sample_element["href"]
     
-       
-        browser.click_link_by_partial_text('Back')
+    # Get Hemisphere Title
+        hemisphere["title"] = browser.find_by_css("h2.title").text
     
-    return hemisphere_image_urls
+    # Append Hemisphere Object to List
+        hemisphere_image_urls.append(hemisphere)
+    
+        return hemisphere_image_urls
